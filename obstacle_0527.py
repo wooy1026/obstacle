@@ -10,7 +10,7 @@ from std_msgs.msg import String, Bool
 
 class ObstacleMove:
     def __init__(self):
-        rospy.init_node('joy_drive')
+        rospy.init_node('obstacle_drive')
 
         # 구독 파트
         rospy.Subscriber("/joy", Joy, self.send_joy_callback)
@@ -18,6 +18,8 @@ class ObstacleMove:
 
         # 발행 파트
         self.drive_pub = rospy.Publisher("/cmd_vel_steer", Twist, queue_size=1)
+
+        rospy.Timer(rospy.Duration(0.1), self.drive_control)
 
         # 변수 초기화
         self.speed = 0
@@ -79,6 +81,7 @@ class ObstacleMove:
         else:
             self.obstacle_exit = False
             self.stop_flag = False
+        
 
     def LiDAR_scan(self):
         if not self.lidar_flag:
@@ -87,6 +90,7 @@ class ObstacleMove:
             self.lidar_flag = True
             
         obstacle_indices = [i for i, data in enumerate(self.msg.ranges) if 0 < data < self.range_obs and 190 - self.obs_range < self.degrees[i] < 190 + self.obs_range]
+        
         if obstacle_indices:
             self.dist_data = min([self.msg.ranges[i] for i in obstacle_indices])
             first = obstacle_indices[0]
@@ -124,13 +128,13 @@ class ObstacleMove:
 
     def drive_control(self, event): 
         drive = Twist()
-        if self.manual:
+        if self.manual == 1:
             self.manual_speed = self.joy_axes[4]
             self.manual_steering = self.joy_axes[0]
-            drive.linear.x = self.manual_speed * 1
+            drive.linear.x = self.manual_speed * 0.5
             drive.angular.z = self.manual_steering * 30
             
-        elif self.auto:
+        elif self.auto == 1:
             if self.scaning:
                 first, first_dst, last, last_dst = self.LiDAR_scan()
                 self.compare_space(first_dst, last_dst)
@@ -154,10 +158,12 @@ class ObstacleMove:
         else:
             drive.linear.x = 0
             drive.angular.z = 0
+
         self.drive_pub.publish(drive)
 
 if __name__ == '__main__':
     try:
+        print("Start")
         move_car = ObstacleMove()
         rospy.spin()
     except KeyboardInterrupt:
